@@ -1,0 +1,16 @@
+{
+  "name": "financiax-web",
+  "private": true,
+  "scripts": {
+    "start": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@mui/material": "^5.15.0",
+    "zustand": "^4.4.0",
+    "@tanstack/react-query": "^4.36.0",
+    "zod": "^4.0.0"
+  }
+}

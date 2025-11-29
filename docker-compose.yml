@@ -1,0 +1,44 @@
+version: '3.9'
+services:
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: financiax
+    ports:
+      - '3306:3306'
+  adminer:
+    image: adminer
+    ports:
+      - '8080:8080'
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+  minio:
+    image: minio/minio
+    command: server /data
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    ports:
+      - '9000:9000'
+  api:
+    build: ./apps/api
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASS: password
+      DB_NAME: financiax
+    depends_on: [mysql]
+  importer:
+    build: ./apps/importer
+    depends_on: [rabbitmq]
+  ml:
+    build: ./apps/ml
+  web:
+    build: ./apps/web
+    ports:
+      - '3000:3000'
+    depends_on: [api]

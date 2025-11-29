@@ -1,0 +1,268 @@
+-- FinanciaX MySQL 8 DDL
+SET NAMES utf8mb4;
+
+CREATE TABLE users (
+  id CHAR(36) PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL DEFAULT 'user',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  INDEX idx_users_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE user_sessions (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  refresh_token VARCHAR(512) NOT NULL,
+  user_agent VARCHAR(255),
+  ip_address VARCHAR(64),
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE accounts (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  currency VARCHAR(10) NOT NULL,
+  balance DECIMAL(18,2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_accounts_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE cards (
+  id CHAR(36) PRIMARY KEY,
+  account_id CHAR(36) NOT NULL,
+  brand VARCHAR(50) NOT NULL,
+  last4 VARCHAR(4) NOT NULL,
+  credit_limit DECIMAL(18,2),
+  cutoff_day TINYINT NOT NULL,
+  due_day TINYINT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_cards_account FOREIGN KEY (account_id) REFERENCES accounts(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE categories (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NULL,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  INDEX idx_categories_user (user_id),
+  CONSTRAINT fk_categories_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE subcategories (
+  id CHAR(36) PRIMARY KEY,
+  category_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  INDEX idx_subcategories_category (category_id),
+  CONSTRAINT fk_subcategories_category FOREIGN KEY (category_id) REFERENCES categories(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE transactions (
+  id CHAR(36) PRIMARY KEY,
+  account_id CHAR(36) NOT NULL,
+  category_id CHAR(36) NULL,
+  subcategory_id CHAR(36) NULL,
+  card_id CHAR(36) NULL,
+  type VARCHAR(50) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  amount DECIMAL(18,2) NOT NULL,
+  currency VARCHAR(10) NOT NULL,
+  date DATE NOT NULL,
+  metadata JSON NULL,
+  duplicate_hash VARCHAR(255) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  INDEX idx_transactions_account_date (account_id, date),
+  INDEX idx_transactions_category_date (category_id, date),
+  CONSTRAINT fk_transactions_account FOREIGN KEY (account_id) REFERENCES accounts(id),
+  CONSTRAINT fk_transactions_category FOREIGN KEY (category_id) REFERENCES categories(id),
+  CONSTRAINT fk_transactions_subcategory FOREIGN KEY (subcategory_id) REFERENCES subcategories(id),
+  CONSTRAINT fk_transactions_card FOREIGN KEY (card_id) REFERENCES cards(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE recurring_rules (
+  id CHAR(36) PRIMARY KEY,
+  account_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  amount DECIMAL(18,2) NOT NULL,
+  currency VARCHAR(10) NOT NULL,
+  frequency VARCHAR(50) NOT NULL,
+  next_run DATE NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_recurring_account FOREIGN KEY (account_id) REFERENCES accounts(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE budgets (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  period VARCHAR(50) NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_budgets_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE budget_limits (
+  id CHAR(36) PRIMARY KEY,
+  budget_id CHAR(36) NOT NULL,
+  category_id CHAR(36) NOT NULL,
+  limit_amount DECIMAL(18,2) NOT NULL,
+  currency VARCHAR(10) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_budget_limits_budget FOREIGN KEY (budget_id) REFERENCES budgets(id),
+  CONSTRAINT fk_budget_limits_category FOREIGN KEY (category_id) REFERENCES categories(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE loans (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  account_id CHAR(36) NOT NULL,
+  principal DECIMAL(18,2) NOT NULL,
+  interest_rate DECIMAL(9,4) NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_loans_user FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_loans_account FOREIGN KEY (account_id) REFERENCES accounts(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE loan_payments (
+  id CHAR(36) PRIMARY KEY,
+  loan_id CHAR(36) NOT NULL,
+  due_date DATE NOT NULL,
+  amount DECIMAL(18,2) NOT NULL,
+  paid_date DATE NULL,
+  status VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  INDEX idx_loan_payments_due (loan_id, due_date),
+  CONSTRAINT fk_loan_payments_loan FOREIGN KEY (loan_id) REFERENCES loans(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE investments (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  account_id CHAR(36) NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  currency VARCHAR(10) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_investments_user FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_investments_account FOREIGN KEY (account_id) REFERENCES accounts(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE investment_trades (
+  id CHAR(36) PRIMARY KEY,
+  investment_id CHAR(36) NOT NULL,
+  trade_date DATE NOT NULL,
+  side VARCHAR(10) NOT NULL,
+  quantity DECIMAL(24,8) NOT NULL,
+  price DECIMAL(18,2) NOT NULL,
+  fees DECIMAL(18,2) DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  INDEX idx_trades_investment_date (investment_id, trade_date),
+  CONSTRAINT fk_trades_investment FOREIGN KEY (investment_id) REFERENCES investments(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE tax_records (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  fiscal_year INT NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  amount DECIMAL(18,2) NOT NULL,
+  currency VARCHAR(10) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_tax_records_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE exchange_rates (
+  id CHAR(36) PRIMARY KEY,
+  base_currency VARCHAR(10) NOT NULL,
+  quote_currency VARCHAR(10) NOT NULL,
+  rate DECIMAL(24,8) NOT NULL,
+  as_of TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE attachments (
+  id CHAR(36) PRIMARY KEY,
+  owner_id CHAR(36) NOT NULL,
+  owner_type VARCHAR(50) NOT NULL,
+  storage_key VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE audit_logs (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NULL,
+  action VARCHAR(255) NOT NULL,
+  resource VARCHAR(255) NOT NULL,
+  metadata JSON NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_audit_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE ml_training_data (
+  id CHAR(36) PRIMARY KEY,
+  transaction_id CHAR(36) NULL,
+  text LONGTEXT NOT NULL,
+  label VARCHAR(255) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_ml_training_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE ml_predictions (
+  id CHAR(36) PRIMARY KEY,
+  transaction_id CHAR(36) NOT NULL,
+  predicted_label VARCHAR(255) NOT NULL,
+  confidence DECIMAL(9,4) NOT NULL,
+  model_version VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at TIMESTAMP NULL,
+  CONSTRAINT fk_ml_predictions_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

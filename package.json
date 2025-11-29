@@ -1,0 +1,11 @@
+{
+  "name": "financiax",
+  "private": true,
+  "workspaces": ["apps/*", "libs/*"],
+  "scripts": {
+    "lint": "echo lint placeholder",
+    "build": "echo build placeholder",
+    "test": "echo test placeholder",
+    "seed": "node apps/api/src/seeds/seed.js"
+  }
+}
